@@ -1,0 +1,205 @@
+{
+ "board": {
+  "size": 2000
+ },
+ "rooms": {
+  "GuestRoom": {
+   "1": {
+    "src": "room_GuestRoom_1.webp",
+    "x": 0.05411250000000003,
+    "y": 0.09345000000000003,
+    "w": 0.21628750000000005,
+    "h": 0.21222500000000005
+   },
+   "2": {
+    "src": "room_GuestRoom_2.webp",
+    "x": 0.05411250000000003,
+    "y": 0.09345000000000003,
+    "w": 0.21628750000000005,
+    "h": 0.21222500000000005
+   }
+  },
+  "Bedroom": {
+   "1": {
+    "src": "room_Bedroom_1.webp",
+    "x": 0.3416441666666667,
+    "y": 0.0936116666666667,
+    "w": 0.28307750000000004,
+    "h": 0.24841833333333338
+   },
+   "2": {
+    "src": "room_Bedroom_2.webp",
+    "x": 0.3416441666666667,
+    "y": 0.0936116666666667,
+    "w": 0.28307750000000004,
+    "h": 0.24841833333333338
+   }
+  },
+  "TVRoom": {
+   "1": {
+    "src": "room_TVRoom_1.webp",
+    "x": 0.6918725000000001,
+    "y": 0.09173250000000008,
+    "w": 0.21607500000000007,
+    "h": 0.17822000000000007
+   },
+   "2": {
+    "src": "room_TVRoom_2.webp",
+    "x": 0.6918725000000001,
+    "y": 0.09173250000000008,
+    "w": 0.21607500000000007,
+    "h": 0.17822000000000007
+   }
+  },
+  "Playroom": {
+   "1": {
+    "src": "room_Playroom_1.webp",
+    "x": 0.058614166666666696,
+    "y": 0.3759941666666667,
+    "w": 0.28072500000000006,
+    "h": 0.2459216666666667
+   },
+   "2": {
+    "src": "room_Playroom_2.webp",
+    "x": 0.058614166666666696,
+    "y": 0.3759941666666667,
+    "w": 0.28072500000000006,
+    "h": 0.2459216666666667
+   }
+  },
+  "Library": {
+   "1": {
+    "src": "room_Library_1.webp",
+    "x": 0.6941208333333334,
+    "y": 0.34141083333333333,
+    "w": 0.21442250000000004,
+    "h": 0.1746225
+   },
+   "2": {
+    "src": "room_Library_2.webp",
+    "x": 0.6941208333333334,
+    "y": 0.34141083333333333,
+    "w": 0.21442250000000004,
+    "h": 0.1746225
+   }
+  },
+  "Bathroom": {
+   "1": {
+    "src": "room_Bathroom_1.webp",
+    "x": 0.6576000000000001,
+    "y": 0.55372,
+    "w": 0.24826666666666672,
+    "h": 0.17476666666666668
+   },
+   "2": {
+    "src": "room_Bathroom_2.webp",
+    "x": 0.6576000000000001,
+    "y": 0.55372,
+    "w": 0.24826666666666672,
+    "h": 0.17476666666666668
+   }
+  },
+  "Kitchen": {
+   "1": {
+    "src": "room_Kitchen_1.webp",
+    "x": 0.056130000000000034,
+    "y": 0.7281333333333334,
+    "w": 0.24892000000000003,
+    "h": 0.2157633333333334
+   },
+   "2": {
+    "src": "room_Kitchen_2.webp",
+    "x": 0.056130000000000034,
+    "y": 0.7281333333333334,
+    "w": 0.24892000000000003,
+    "h": 0.2157633333333334
+   }
+  },
+  "DiningHall": {
+   "1": {
+    "src": "room_DiningHall_1.webp",
+    "x": 0.37654166666666666,
+    "y": 0.6934458333333333,
+    "w": 0.21271250000000005,
+    "h": 0.24846250000000006
+   },
+   "2": {
+    "src": "room_DiningHall_2.webp",
+    "x": 0.37654166666666666,
+    "y": 0.6934458333333333,
+    "w": 0.21271250000000005,
+    "h": 0.24846250000000006
+   }
+  },
+  "Storage": {
+   "1": {
+    "src": "room_Storage_1.webp",
+    "x": 0.6548133333333334,
+    "y": 0.7957641666666667,
+    "w": 0.2555491666666667,
+    "h": 0.14742583333333337
+   },
+   "2": {
+    "src": "room_Storage_2.webp",
+    "x": 0.6548133333333334,
+    "y": 0.7957641666666667,
+    "w": 0.2555491666666667,
+    "h": 0.14742583333333337
+   }
+  }
+ },
+ "cards": {
+  "rotom_base": "card_rotom_base.webp",
+  "rotom_heat": "card_rotom_heat.webp",
+  "rotom_wash": "card_rotom_wash.webp",
+  "rotom_frost": "card_rotom_frost.webp",
+  "rotom_fan": "card_rotom_fan.webp",
+  "rotom_mow": "card_rotom_mow.webp",
+  "item_antidote": "card_item_antidote.webp",
+  "item_bigpearl": "card_item_bigpearl.webp",
+  "item_dreadplate": "card_item_dreadplate.webp",
+  "item_honey": "card_item_honey.webp",
+  "item_oldgateau": "card_item_oldgateau.webp",
+  "item_rarecandy": "card_item_rarecandy.webp",
+  "item_secretkey": "card_item_secretkey.webp",
+  "item_tm90": "card_item_tm90.webp",
+  "room_Bathroom": "card_room_Bathroom.webp",
+  "room_Bedroom": "card_room_Bedroom.webp",
+  "room_DiningHall": "card_room_DiningHall.webp",
+  "room_GuestRoom": "card_room_GuestRoom.webp",
+  "room_Kitchen": "card_room_Kitchen.webp",
+  "room_Library": "card_room_Library.webp",
+  "room_Playroom": "card_room_Playroom.webp",
+  "room_Storage": "card_room_Storage.webp",
+  "room_TVRoom": "card_room_TVRoom.webp",
+  "ghost_2": "card_ghost_2.webp",
+  "ghost_3": "card_ghost_3.webp",
+  "ghost_4": "card_ghost_4.webp",
+  "ghost_5": "card_ghost_5.webp",
+  "ghost_6": "card_ghost_6.webp",
+  "ghost_7": "card_ghost_7.webp",
+  "ghost_8": "card_ghost_8.webp",
+  "ghost_9": "card_ghost_9.webp",
+  "ghost_10": "card_ghost_10.webp",
+  "ghost_11": "card_ghost_11.webp",
+  "ghost_12": "card_ghost_12.webp",
+  "back": "card_back.webp"
+ },
+ "tokens": {
+  "base": "tok_base.webp",
+  "heat": "tok_heat.webp",
+  "wash": "tok_wash.webp",
+  "frost": "tok_frost.webp",
+  "fan": "tok_fan.webp",
+  "mow": "tok_mow.webp"
+ },
+ "ghost_token": "ghost_token.webp",
+ "mark_x": "mark_x.webp",
+ "mark_q": "mark_q.webp",
+ "mark_check": "mark_check.webp",
+ "guessboard": {
+  "src": "guessboard.webp",
+  "w": 900,
+  "h": 1796
+ }
+}
