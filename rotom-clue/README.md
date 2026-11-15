@@ -19,23 +19,26 @@ Coche *Mode test* sur la page d'accueil. Crée la partie dans un onglet, puis re
 ## Ce qui est automatique
 - **Le bouton Start** mélange les cartes, remplit le Peebboof, distribue les mains et répartit les cartes fantômes dans les pièces. Il tire aussi au hasard les portes et les passages secrets (variante A ou B de chaque pièce).
 - **Les dés** : 2 dés, avec un total de 2 à 12. Les cartes fantômes dont c'est le numéro se révèlent toutes seules. Une carte déjà révélée reçoit un jeton fantôme supplémentaire.
-- **Entrer dans une pièce** en glissant son pion y fait piocher une carte fantôme, s'il en reste.
+- **Déplacement case par case** : on avance avec les flèches (écran ou clavier) ou en touchant les cases en surbrillance. Un mouvement impossible (mur, porte fermée, case occupée, case déjà visitée) ne coûte aucun pas, et le bouton « Annuler le dernier pas » permet de revenir en arrière.
+- **Entrer dans une pièce** par une porte ouverte termine le déplacement et fait piocher une carte fantôme, s'il en reste. Pour sortir d'une pièce, on touche une porte verte en surbrillance.
 - **Suggestions** : le Rotom et l'objet suggérés sont déplacés dans la pièce. La réfutation se fait dans l'ordre du tour, et la carte montrée n'est visible que par celui qui a fait la suggestion.
 - **Accusation** : clique sur le bouton *Accuser* ou sur le centre du plateau. Une seule accusation est permise par joueur.
 
 ## Ce qui reste manuel (« table virtuelle »)
-- **Les déplacements** : tu glisses ton pion du nombre de cases indiqué, et le jeu ne compte pas les cases.
 - **Les effets des cartes fantômes** se jouent avec le bouton *Effets des cartes fantômes…*, qui permet de :
   - regarder une carte au hasard chez un joueur ;
   - donner une carte ;
   - piocher dans une pièce ;
-  - basculer les portes d'une pièce.
+  - basculer les portes d'une pièce ;
+  - modifier son nombre de pas (Shuppet, Gastly) ;
+  - se téléporter dans une pièce (Gengar).
   Les jetons fantômes s'ajoutent ou se retirent avec les boutons + / −. Le bouton ↩ remet la carte en main une fois l'effet résolu.
 
 ## Réglages
 Les réglages sont dans `js/config.js` :
 - le nombre de joueurs ;
-- les doublons du paquet fantôme (`GHOST_DUPLICATES`) ;
+- le nombre d'exemplaires de chaque fantôme (`GHOST_COPIES`, 3 par défaut, soit 33 cartes) ;
+- les portes de chaque pièce (`DOORS`) ;
 - le nombre de dés ;
 - les textes des cartes ;
 - les passages secrets.

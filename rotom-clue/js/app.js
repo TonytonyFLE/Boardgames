@@ -28,8 +28,7 @@
   let me = null, token = null;
   let S = null; // { pub, priv }
   let seenLog = 0, seenInbox = 0, firstState = true;
-  let tab = 'hand', modalKind = null;
-  let dragging = null;
+  let tab = 'invest', modalKind = null;
   let noteTool = 'x';
 
   const client = {
@@ -230,7 +229,6 @@
         el.dataset.tok = k;
         el.innerHTML = `<img src="${t === 'i' ? A + 'itok_' + key + '.webp' : tokSrc(key)}" alt="">`;
         wrap.appendChild(el);
-        el.addEventListener('pointerdown', (e) => startDrag(e, el));
       }
       const owner = t === 'r' && pub.players.find((p) => p.rotom === key);
       el.classList.toggle('npc', t === 'r' && !owner);
@@ -239,39 +237,41 @@
       let nm = el.querySelector('.nm');
       if (owner) { if (!nm) { nm = document.createElement('span'); nm.className = 'nm'; el.appendChild(nm); } nm.textContent = owner.name; }
       else if (nm) nm.remove();
-      const can = pub.phase === 'playing' && (isHost || (owner && owner.id === me && cur && cur.id === me));
-      el.classList.toggle('can', !!can);
       el.title = t === 'r' ? H.rotomName(key) + (owner ? ' — ' + owner.name : '') : H.itemName(key);
-      if (dragging !== el) { el.style.left = pos.x * 100 + '%'; el.style.top = pos.y * 100 + '%'; }
+      el.style.left = pos.x * 100 + '%'; el.style.top = pos.y * 100 + '%';
     }
+    renderHighlights();
   }
 
-  function startDrag(e, el) {
-    if (!el.classList.contains('can')) return;
-    e.preventDefault();
-    const board = $('#board');
-    dragging = el;
-    el.classList.add('dragging');
-    el.setPointerCapture(e.pointerId);
-    const move = (ev) => {
-      const r = board.getBoundingClientRect();
-      const x = Math.min(0.99, Math.max(0.01, (ev.clientX - r.left) / r.width));
-      const y = Math.min(0.99, Math.max(0.01, (ev.clientY - r.top) / r.height));
-      el.style.left = x * 100 + '%'; el.style.top = y * 100 + '%';
-      el._pos = [x, y];
-    };
-    const up = () => {
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-      el.removeEventListener('pointercancel', up);
-      el.classList.remove('dragging');
-      dragging = null;
-      if (el._pos) { act({ type: 'move', tok: el.dataset.tok, x: el._pos[0], y: el._pos[1] }); el._pos = null; }
-    };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
+  // ----- déplacement -----
+  const ARROWS = { up: '↑', down: '↓', left: '←', right: '→' };
+  function myMove() {
+    const { pub } = S;
+    if (pub.phase !== 'playing' || pub.order[pub.turn] !== me) return null;
+    return pub.moveOpts;
   }
+  function renderHighlights() {
+    const hl = $('#hl');
+    const mo = myMove();
+    let h = '';
+    if (mo && mo.steps > 0) {
+      for (const [d, t] of Object.entries(mo.dirs)) {
+        h += `<button class="hl ${t.room ? 'room' : ''}" data-dir="${d}" style="left:${t.x * 100}%;top:${t.y * 100}%" title="${t.room ? 'Entrer : ' + esc(H.roomName(t.room)) : ''}">${t.room ? '🚪 ' + esc(H.roomName(t.room)) : ARROWS[d]}</button>`;
+      }
+      mo.exits.forEach((e) => { h += `<button class="hl exit" data-exit="${e.cell}" style="left:${e.x * 100}%;top:${e.y * 100}%" title="Sortir par cette porte">🚪</button>`; });
+    }
+    hl.innerHTML = h;
+    $$('[data-dir]', hl).forEach((b) => (b.onclick = () => act({ type: 'step', dir: b.dataset.dir })));
+    $$('[data-exit]', hl).forEach((b) => (b.onclick = () => act({ type: 'exit', cell: b.dataset.exit })));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (!S || modalKind || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    const mo = myMove();
+    if (!mo) return;
+    if (map[e.key]) { e.preventDefault(); act({ type: 'step', dir: map[e.key] }); }
+    if ((e.key === 'Backspace' || (e.key === 'z' && (e.ctrlKey || e.metaKey))) && mo.canUndo) { e.preventDefault(); act({ type: 'undo' }); }
+  });
 
   // ----- tour -----
   function renderTurn() {
@@ -291,8 +291,22 @@
     const meNow = meP();
     let h = `<div class="turn-who ${mine ? 'me' : ''}"><img src="${tokSrc(cur.rotom)}" alt="">${mine ? 'À toi de jouer !' : 'Tour de ' + esc(cur.name)}</div>`;
     if (pub.dice) {
-      h += `<div class="dice">${pub.dice.values.map((v) => `<span class="die">${v}</span>`).join('')} = <b>${pub.dice.sum}</b>
-        <span class="hint">${mine ? 'déplace ton pion de ' + pub.dice.sum + ' cases (glisse-le sur le plateau)' : ''}</span></div>`;
+      h += `<div class="dice">${pub.dice.values.map((v) => `<span class="die">${v}</span>`).join('')} = <b>${pub.dice.sum}</b></div>`;
+    }
+    const mo = pub.moveOpts;
+    if (mo) {
+      if (mine && mo.steps > 0) {
+        const pad = (d) => `<button class="btn pad-${d}" data-step="${d}" ${mo.dirs[d] ? '' : 'disabled'}>${ARROWS[d]}</button>`;
+        h += `<div class="movebox"><div class="steps"><b>${mo.steps}</b> pas restant${mo.steps > 1 ? 's' : ''}</div>
+          ${mo.exits.length ? `<div class="hint">Tu es dans une pièce : clique sur une porte 🚪 verte sur le plateau pour sortir (1 pas).</div>`
+            : `<div class="moverow"><div class="pad">${pad('up')}${pad('left')}${pad('right')}${pad('down')}</div>
+               <div class="padside"><button class="btn small ghost" id="b-undo" ${mo.canUndo ? '' : 'disabled'}>↶ Annuler le dernier pas</button>
+               <span class="hint">Tu peux aussi cliquer sur les cases en surbrillance ou utiliser les flèches du clavier.</span></div></div>`}</div>`;
+      } else if (mine && mo.entered) {
+        h += `<div class="hint">Tu es entré dans une pièce : ton déplacement est terminé.</div>`;
+      } else if (!mine && mo.steps > 0) {
+        h += `<div class="hint">${esc(cur.name)} se déplace… (${mo.steps} pas restant${mo.steps > 1 ? 's' : ''})</div>`;
+      }
     }
     const sg = pub.suggestion;
     if (sg) {
@@ -311,7 +325,7 @@
         <button class="btn" id="b-sug" ${!room || pub.suggested || meNow.eliminated ? 'disabled' : ''}>🔎 Suggérer${room ? ' (' + esc(H.roomName(room)) + ')' : ''}</button>
         <button class="btn danger" id="b-acc" ${meNow.eliminated ? 'disabled' : ''}>⚖️ Accuser</button>
         <button class="btn ghost" id="b-end" ${sg && !sg.done ? 'disabled' : ''}>Fin du tour ➜</button></div>`;
-      if (!room) h += '<div class="hint">Entre dans une pièce pour pouvoir faire une suggestion. Le Peebboof (au centre) sert à accuser.</div>';
+      if (!room && !pub.rolled) h += '<div class="hint">Lance les dés, puis déplace ton pion case par case jusqu\'à une pièce pour pouvoir y faire une suggestion.</div>';
     } else if (me === pub.hostId) {
       h += `<div class="actions"><button class="btn small ghost" id="b-skip">Passer le tour de ${esc(cur.name)} (hôte)</button></div>`;
     }
@@ -325,15 +339,17 @@
     on('b-end', () => act({ type: 'endTurn' }));
     on('b-skip', () => confirmBox('Passer le tour ?', `Le tour de ${esc(cur.name)} sera terminé.`, () => act({ type: 'skip' })));
     on('b-fx', openEffects);
+    on('b-undo', () => act({ type: 'undo' }));
+    $$('[data-step]', box).forEach((b) => (b.onclick = () => act({ type: 'step', dir: b.dataset.step })));
   }
 
   // ----- onglets -----
   $$('.tabs button').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderTab(); }));
   function renderTab() {
     $$('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    ['hand', 'notes', 'players', 'log'].forEach((t) => $('#pane-' + t).classList.toggle('hidden', t !== tab));
-    if (tab === 'hand') renderHand();
-    if (tab === 'notes') renderNotes();
+    ['invest', 'ghosts', 'players', 'log'].forEach((t) => $('#pane-' + t).classList.toggle('hidden', t !== tab));
+    if (tab === 'invest') { renderMyCards(); renderNotes(); }
+    if (tab === 'ghosts') renderGhosts();
     if (tab === 'players') renderPlayers();
     if (tab === 'log') renderLog();
   }
@@ -341,21 +357,29 @@
   const cardBtn = (id, extra = '') => `<button class="card ${extra}" data-card="${id}"><img src="${cardSrc(id)}" alt="${esc(H.cardName(id))}" title="${esc(H.cardName(id))}"></button>`;
   function bindZoom(root) { $$('[data-card]', root).forEach((b) => { if (!b.onclick) b.onclick = () => zoom(b.dataset.card); }); }
 
-  function renderHand() {
-    const pane = $('#pane-hand');
-    const p = S.priv || { hand: [], ghostHand: [] };
-    const mp = meP();
+  function renderMyCards() {
+    const p = S.priv || { hand: [] };
     const order = (id) => ['r', 'i', 'm'].indexOf(id[0]);
     const hand = [...p.hand].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+    const el = $('#mycards');
+    el.innerHTML = `<div class="strip-title">Mes cartes <span class="hint">(elles ne sont pas dans le Peebboof)</span></div>
+      <div class="strip">${hand.map((c) => cardBtn(c)).join('') || '<span class="empty">Aucune</span>'}</div>`;
+    bindZoom(el);
+  }
+
+  function renderGhosts() {
+    const pane = $('#pane-ghosts');
+    const p = S.priv || { ghostHand: [] };
+    const mp = meP();
     pane.innerHTML = `
-      <h4>Mes cartes indices (${hand.length})</h4>
-      <div class="cards">${hand.map((c) => cardBtn(c)).join('') || '<span class="empty">Aucune</span>'}</div>
-      <p class="hint">Ces cartes ne peuvent PAS être dans le Peebboof : coche-les dans tes notes.</p>
       <h4>Mes cartes fantômes cachées (${p.ghostHand.length})</h4>
-      <div class="cards">${p.ghostHand.map((c) => cardBtn(c)).join('') || '<span class="empty">Aucune — tu en pioches en entrant dans une pièce.</span>'}</div>
-      <p class="hint">Quand quelqu'un lance le numéro d'une de tes cartes fantômes, elle se révèle automatiquement.</p>
-      ${mp && mp.active.length ? `<h4>Mes fantômes actifs</h4>${activeGhosts(mp)}` : ''}`;
+      <div class="cards">${p.ghostHand.map((c) => cardBtn(c)).join('') || '<span class="empty">Aucune pour l\'instant : tu en pioches une en entrant dans une pièce.</span>'}</div>
+      <p class="hint">Quand quelqu'un obtient aux dés le numéro d'une de tes cartes fantômes, elle se révèle automatiquement.</p>
+      <h4>Mes fantômes actifs</h4>
+      ${mp && mp.active.length ? activeGhosts(mp) : '<span class="empty">Aucun.</span>'}
+      <div class="actions" style="margin-top:12px"><button class="btn small" id="b-fx2">👻 Effets des cartes fantômes…</button></div>`;
     bindZoom(pane); bindGhostBtns(pane);
+    $('#b-fx2').onclick = openEffects;
   }
 
   function activeGhosts(p) {
@@ -416,9 +440,14 @@
       const o = others[c];
       h += `<div class="nhead" style="left:${fx(x0)}%;width:${fx(x1) - fx(x0)}%;top:${fy(NB.head[0])}%;height:${fy(NB.head[1]) - fy(NB.head[0])}%">${o ? esc(o.name) : ''}</div>`;
     });
+    const mine = new Set((S.priv && S.priv.hand) || []);
     NB.secs.forEach((sec) => {
       const rh = (sec.y[1] - sec.y[0]) / sec.keys.length;
       sec.keys.forEach((k, r) => {
+        if (mine.has(sec.t + ':' + k)) {
+          const yy = sec.y[0] + r * rh;
+          h += `<div class="nmine" title="Ma carte" style="left:${fx(52)}%;width:${fx(430) - fx(52)}%;top:${fy(yy)}%;height:${fy(yy + rh) - fy(yy)}%"></div>`;
+        }
         NB.cols.forEach(([x0, x1], c) => {
           const id = sec.t + ':' + k + ':' + c;
           const v = notes[id];
@@ -427,7 +456,7 @@
         });
       });
     });
-    h += '</div><p class="hint">Les colonnes correspondent aux autres joueurs, dans l\'ordre du tour. Tes notes restent sur ton appareil.</p>';
+    h += '</div><p class="hint">Choisis un marqueur puis touche une case. Les colonnes sont les autres joueurs, dans l\'ordre du tour ; tes propres cartes sont surlignées. Tes notes restent sur ton appareil.</p>';
     wrap.innerHTML = h;
     $$('[data-tool]', wrap).forEach((b) => (b.onclick = () => { noteTool = b.dataset.tool; renderNotes(); }));
     $$('.ncell', wrap).forEach((b) => (b.onclick = () => {
@@ -537,12 +566,18 @@
       <div class="choice" id="fx-to">${others.map((o) => `<button class="btn small" data-to="${o.id}" disabled>à ${esc(o.name)}</button>`).join('')}</div>
       <h4>👻 Piocher une carte fantôme dans…</h4><p class="hint">Dusknoir (11)</p>
       <div class="choice">${C.ROOMS.map((r) => `<button class="btn small" data-draw="${r.key}" ${pub.roomGhostCount[r.key] ? '' : 'disabled'}>${esc(r.name)} (${pub.roomGhostCount[r.key] || 0})</button>`).join('')}</div>
+      ${pub.order[pub.turn] === me ? `<h4>🦶 Modifier mon déplacement</h4><p class="hint">Shuppet (6) : −2 pas · Gastly (7) : +2 pas, par jeton fantôme</p>
+      <div class="choice"><button class="btn small" data-adj="-2">−2 pas</button><button class="btn small" data-adj="2">+2 pas</button></div>
+      <h4>🌀 Me téléporter dans…</h4><p class="hint">Gengar (12) : au lieu de lancer les dés</p>
+      <div class="choice">${C.ROOMS.map((r) => `<button class="btn small ghost" data-warp="${r.key}">${esc(r.name)}</button>`).join('')}</div>` : ''}
       <h4>🚪 Basculer les portes de…</h4><p class="hint">Misdreavus (9)</p>
       <div class="choice">${C.ROOMS.map((r) => `<button class="btn small ghost" data-door="${r.key}">${esc(r.name)}</button>`).join('')}</div>
       <div class="modal-row"><button class="btn ghost" data-close>Fermer</button></div>`, (r) => {
       $('[data-close]', r).onclick = () => closeModal();
       $$('[data-peek]', r).forEach((b) => (b.onclick = () => { closeModal(); act({ type: 'peek', target: b.dataset.peek }); }));
       $$('[data-draw]', r).forEach((b) => (b.onclick = () => { closeModal(); act({ type: 'drawGhost', room: b.dataset.draw }); }));
+      $$('[data-adj]', r).forEach((b) => (b.onclick = () => { closeModal(); act({ type: 'adjustSteps', delta: +b.dataset.adj }); }));
+      $$('[data-warp]', r).forEach((b) => (b.onclick = () => { closeModal(); act({ type: 'warp', room: b.dataset.warp }); }));
       $$('[data-door]', r).forEach((b) => (b.onclick = () => { act({ type: 'toggleDoors', room: b.dataset.door }); toast('Portes basculées : ' + H.roomName(b.dataset.door)); }));
       $$('[data-g]', r).forEach((b) => (b.onclick = () => {
         giveSel = b.dataset.g;

@@ -4,21 +4,20 @@ window.RC = {
   // ---------- Réglages ----------
   MIN_PLAYERS: 2,
   MAX_PLAYERS: 6,
-  // Paquet fantôme : les 11 fantômes (2 à 12) + des doublons.
-  // 'random' = un fantôme tiré au hasard est doublé à chaque partie.
-  // Tu peux aussi mettre une liste fixe, ex. [7] ou [6, 8]. [] = pas de doublon.
-  GHOST_DUPLICATES: 'random',
+  // Paquet fantôme : nombre d'exemplaires de CHAQUE fantôme (2 à 12).
+  // 3 => 33 cartes, soit 3 ou 4 cartes par pièce.
+  GHOST_COPIES: 3,
   // Nombre de dés lancés (2 = résultat de 2 à 12, comme les numéros des fantômes)
   DICE: 2,
 
   // ---------- Cartes ----------
   ROTOMS: [
-    { key: 'base',  name: 'Rotom (Base)', color: '#8ff5e0', start: [0.572, 0.077] },
-    { key: 'heat',  name: 'Rotom Heat',   color: '#ff6b6b', start: [0.325, 0.925] },
-    { key: 'wash',  name: 'Rotom Wash',   color: '#3d7bff', start: [0.896, 0.288] },
-    { key: 'frost', name: 'Rotom Frost',  color: '#9b6bff', start: [0.071, 0.673] },
-    { key: 'fan',   name: 'Rotom Fan',    color: '#ffe680', start: [0.393, 0.077] },
-    { key: 'mow',   name: 'Rotom Mow',    color: '#6be38a', start: [0.890, 0.746] },
+    { key: 'base', cell: '15,2', exitDir: 'down',  name: 'Rotom (Base)', color: '#8ff5e0', start: [0.572, 0.077] },
+    { key: 'heat', cell: '8,24', exitDir: 'up',  name: 'Rotom Heat',   color: '#ff6b6b', start: [0.325, 0.925] },
+    { key: 'wash', cell: '23,7', exitDir: 'left',  name: 'Rotom Wash',   color: '#3d7bff', start: [0.896, 0.288] },
+    { key: 'frost', cell: '2,18', exitDir: 'right', name: 'Rotom Frost',  color: '#9b6bff', start: [0.071, 0.673] },
+    { key: 'fan', cell: '10,2', exitDir: 'down',   name: 'Rotom Fan',    color: '#ffe680', start: [0.393, 0.077] },
+    { key: 'mow', cell: '23,20', exitDir: 'left',   name: 'Rotom Mow',    color: '#6be38a', start: [0.890, 0.746] },
   ],
   ITEMS: [
     { key: 'antidote',   name: 'Antidote' },
@@ -41,6 +40,19 @@ window.RC = {
     { key: 'Storage',    name: 'Storage' },
     { key: 'TVRoom',     name: 'TV Room' },
   ],
+  // Portes : case de couloir devant la porte, direction pour entrer, variantes où la porte est ouverte
+  DOORS: {
+    GuestRoom:  [{ cell: '5,8',   dir: 'up',    open: [1, 2] }],
+    Bedroom:    [{ cell: '8,6',   dir: 'right', open: [1] },  { cell: '17,6', dir: 'left', open: [2] },
+                 { cell: '10,9',  dir: 'up',    open: [2] },  { cell: '15,9', dir: 'up',   open: [1] }],
+    TVRoom:     [{ cell: '21,7',  dir: 'up',    open: [1, 2] }],
+    Playroom:   [{ cell: '9,13',  dir: 'left',  open: [2] },  { cell: '7,17', dir: 'up',   open: [1] }],
+    Library:    [{ cell: '18,11', dir: 'right', open: [2] },  { cell: '23,14', dir: 'up',  open: [1] }],
+    Bathroom:   [{ cell: '21,14', dir: 'down',  open: [2] },  { cell: '17,17', dir: 'right', open: [1] }],
+    Kitchen:    [{ cell: '8,20',  dir: 'left',  open: [1, 2] }],
+    DiningHall: [{ cell: '12,18', dir: 'down',  open: [1] },  { cell: '13,18', dir: 'down', open: [2] }, { cell: '16,21', dir: 'left', open: [1] }],
+    Storage:    [{ cell: '17,22', dir: 'right', open: [1, 2] }],
+  },
   // Passages secrets : la variante (1 ou 2) de la pièce dans laquelle l'entrée est ouverte
   PASSAGES: {
     GuestRoom: { to: 'Storage',   openIn: 2 },

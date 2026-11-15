@@ -37,6 +37,13 @@
     return [g.x + g.w / 2, g.y + g.h / 2];
   }
   const SLOT = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1], [-2, 0], [2, 0], [-2, 1], [2, 1], [-2, -1]];
+  // ----- grille -----
+  const G = window.RC_GRID;
+  const CELLS = new Set(G.cells);
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const cellXY = (c) => { const [i, j] = c.split(',').map(Number); return [(G.OX + (i + 0.5) * G.P) / G.SIZE, (G.OY + (j + 0.5) * G.P) / G.SIZE]; };
+  const addDir = (c, d) => { const [i, j] = c.split(',').map(Number); return (i + DIRS[d][0]) + ',' + (j + DIRS[d][1]); };
+  const TOKORDER = C.ROTOMS.map((r) => 'r:' + r.key).concat(C.ITEMS.map((r) => 'i:' + r.key));
 
   class Host {
     constructor(code, net, saved) {
@@ -45,7 +52,7 @@
       this.s = saved || {
         code, phase: 'lobby', seq: 0, hostId: null,
         players: [], order: [], turn: 0, rolled: false, dice: null, suggested: false,
-        tokens: {}, roomVar: {}, roomGhosts: {}, peebboof: null, suggestion: null,
+        tokens: {}, loc: {}, move: null, roomVar: {}, roomGhosts: {}, peebboof: null, suggestion: null,
         log: [], winner: null,
       };
       if (saved) this.s.players.forEach((p) => (p.connected = false));
@@ -81,9 +88,9 @@
           id: p.id, name: p.name, rotom: p.rotom, connected: !!p.connected,
           handCount: p.hand.length, ghostCount: p.ghostHand.length,
           active: p.active.map((a) => ({ id: a.id, tokens: a.tokens })),
-          eliminated: !!p.eliminated, room: p.room || null,
+          eliminated: !!p.eliminated, room: p.rotom ? this.roomOf('r:' + p.rotom) : null,
         })),
-        order: s.order, turn: s.turn, rolled: s.rolled, dice: s.dice, suggested: s.suggested,
+        order: s.order, turn: s.turn, rolled: s.rolled, dice: s.dice, suggested: s.suggested, moveOpts: s.phase === 'playing' ? this.moveOpts() : null,
         tokens: s.tokens, roomVar: s.roomVar,
         roomGhostCount: Object.fromEntries(Object.entries(s.roomGhosts).map(([k, v]) => [k, v.length])),
         suggestion: s.suggestion && {
@@ -195,33 +202,86 @@
           const dice = Array.from({ length: C.DICE }, () => 1 + Math.floor(Math.random() * 6));
           const sum = dice.reduce((x, y) => x + y, 0);
           s.dice = { values: dice, sum, by: p.id }; s.rolled = true;
+          const here = s.loc['r:' + p.rotom];
+          s.move = { steps: sum, path: [{ ...here }], entered: false, startRoom: here.t === 'room' ? here.r : null };
           this.log(`🎲 ${p.name} lance les dés : ${dice.join(' + ')} = ${sum}`, 'dice');
           this.triggerGhosts(sum, p);
           return;
         }
-        case 'move': {
-          const tok = String(a.tok || '');
-          if (!(tok in s.tokens)) return;
-          const own = tok === 'r:' + p.rotom;
-          if (!isHost && !(own && myTurn)) return own ? 'Attends ton tour pour te déplacer.' : 'Tu ne peux déplacer que ton propre pion.';
-          const x = Math.min(0.99, Math.max(0.01, +a.x)), y = Math.min(0.99, Math.max(0.01, +a.y));
-          if (!isFinite(x) || !isFinite(y)) return;
-          const before = roomAt(s.tokens[tok].x, s.tokens[tok].y);
-          s.tokens[tok] = { x, y };
-          const after = roomAt(x, y);
-          const owner = s.players.find((q) => 'r:' + q.rotom === tok);
-          if (owner) owner.room = after;
-          if (owner && owner === p && after && after !== before) this.enterRoom(p, after);
+        case 'step': {
+          if (!myTurn) return 'Ce n\'est pas ton tour.';
+          const m = s.move;
+          if (!s.rolled || !m) return 'Lance d\'abord les dés.';
+          if (m.steps <= 0) return m.entered ? 'Tu es entré dans une pièce : ton déplacement est terminé.' : 'Tu n\'as plus de pas.';
+          if (!DIRS[a.dir]) return;
+          const tok = 'r:' + p.rotom, cur = s.loc[tok];
+          let target = null;
+          if (cur.t === 'start') {
+            const st = C.ROTOMS.find((r) => r.key === cur.k);
+            if (a.dir !== st.exitDir) return 'Impossible par là.';
+            target = { t: 'cell', c: st.cell };
+          } else if (cur.t === 'cell') {
+            const door = this.doorAt(cur.c, a.dir);
+            if (door) {
+              if (!door.isOpen) return 'Cette porte est fermée.';
+              target = { t: 'room', r: door.room };
+            } else {
+              const nc = addDir(cur.c, a.dir);
+              if (!CELLS.has(nc)) return 'Impossible par là : c\'est un mur.';
+              target = { t: 'cell', c: nc };
+            }
+          } else return 'Tu es dans une pièce : choisis une porte pour sortir.';
+          return this.moveTo(p, target);
+        }
+        case 'exit': {
+          if (!myTurn) return 'Ce n\'est pas ton tour.';
+          const m = s.move;
+          if (!s.rolled || !m) return 'Lance d\'abord les dés.';
+          if (m.entered) return 'Tu ne peux pas entrer et sortir d\'une pièce dans le même tour.';
+          if (m.steps <= 0) return 'Tu n\'as plus de pas.';
+          const room = this.roomOf('r:' + p.rotom);
+          if (!room) return;
+          const door = this.openDoors(room).find((d) => d.cell === a.cell);
+          if (!door) return 'Cette porte est fermée.';
+          return this.moveTo(p, { t: 'cell', c: door.cell });
+        }
+        case 'undo': {
+          if (!myTurn) return;
+          const m = s.move;
+          if (!m || m.path.length < 2) return 'Rien à annuler.';
+          if (m.entered) return 'Tu es entré dans une pièce : impossible d\'annuler.';
+          m.path.pop();
+          s.loc['r:' + p.rotom] = { ...m.path[m.path.length - 1] };
+          m.steps += 1;
+          this.layout();
+          return;
+        }
+        case 'warp': {
+          if (!myTurn) return 'Ce n\'est pas ton tour.';
+          if (!C.ROOMS.some((r) => r.key === a.room)) return;
+          s.loc['r:' + p.rotom] = { t: 'room', r: a.room };
+          s.rolled = true; s.move = null;
+          this.layout();
+          this.log(`🌀 ${p.name} se téléporte dans ${roomName(a.room)} (Gengar).`, 'ghost');
+          return;
+        }
+        case 'adjustSteps': {
+          if (!myTurn) return 'Ce n\'est pas ton tour.';
+          if (!s.move) return 'Lance d\'abord les dés.';
+          const d = a.delta > 0 ? 2 : -2;
+          s.move.steps = Math.max(0, s.move.steps + d);
+          this.log(`👻 ${p.name} ${d > 0 ? 'gagne' : 'perd'} 2 pas (${d > 0 ? 'Gastly' : 'Shuppet'}) : il lui en reste ${s.move.steps}.`, 'ghost');
           return;
         }
         case 'passage': {
           if (!myTurn) return 'Ce n\'est pas ton tour.';
           if (s.rolled) return 'Tu as déjà lancé les dés : le passage secret n\'est plus possible ce tour-ci.';
-          const from = p.room, ps = from && C.PASSAGES[from];
+          const from = this.roomOf('r:' + p.rotom), ps = from && C.PASSAGES[from];
           if (!ps) return 'Il n\'y a pas de passage secret ici.';
           if (s.roomVar[from] !== ps.openIn) return 'L\'entrée du passage secret est fermée.';
-          this.placeInRoom('r:' + p.rotom, ps.to);
-          p.room = ps.to; s.rolled = true;
+          s.loc['r:' + p.rotom] = { t: 'room', r: ps.to };
+          s.rolled = true; s.move = null;
+          this.layout();
           this.log(`🚪 ${p.name} emprunte le passage secret : ${roomName(from)} → ${roomName(ps.to)}`);
           this.enterRoom(p, ps.to);
           return;
@@ -230,15 +290,17 @@
           if (!myTurn) return 'Ce n\'est pas ton tour.';
           if (p.eliminated) return 'Tu es éliminé : tu ne peux plus faire de suggestion.';
           if (s.suggested) return 'Tu as déjà fait une suggestion ce tour-ci.';
-          const room = p.room;
+          const room = this.roomOf('r:' + p.rotom);
           if (!room) return 'Ton pion doit être dans une pièce pour faire une suggestion.';
           if (!C.ROTOMS.some((r) => r.key === a.rotom) || !C.ITEMS.some((r) => r.key === a.item)) return 'Choisis un Rotom et un objet.';
           s.suggested = true;
-          this.placeInRoom('r:' + a.rotom, room);
-          this.placeInRoom('i:' + a.item, room);
           const moved = s.players.find((q) => q.rotom === a.rotom);
-          if (moved) moved.room = room;
+          const was = this.roomOf('r:' + a.rotom);
+          s.loc['r:' + a.rotom] = { t: 'room', r: room };
+          s.loc['i:' + a.item] = { t: 'room', r: room };
+          this.layout();
           this.log(`🔎 ${p.name} suggère : ${rotomName(a.rotom)} dans ${roomName(room)} avec ${itemName(a.item)}`, 'suggest');
+          if (moved && moved !== p && was !== room) this.log(`📢 ${moved.name} (${rotomName(a.rotom)}) est convoqué dans ${roomName(room)} !`, 'suggest');
           const i = s.order.indexOf(p.id);
           const queue = [];
           for (let k = 1; k < s.order.length; k++) queue.push(s.order[(i + k) % s.order.length]);
@@ -373,10 +435,8 @@
       const deck = shuffle(R.concat(I, M));
       deck.forEach((c, i) => this.P(s.order[i % s.order.length]).hand.push(c));
       // paquet fantôme
-      let ghosts = Object.keys(C.GHOSTS).map((n) => 'g:' + n);
-      let dup = C.GHOST_DUPLICATES;
-      if (dup === 'random') dup = [shuffle(Object.keys(C.GHOSTS))[0]];
-      (dup || []).forEach((n, k) => ghosts.push('g:' + n + '#' + (k + 2)));
+      const ghosts = [];
+      for (let c = 1; c <= Math.max(1, C.GHOST_COPIES || 1); c++) Object.keys(C.GHOSTS).forEach((n) => ghosts.push('g:' + n + (c > 1 ? '#' + c : '')));
       shuffle(ghosts);
       s.roomGhosts = {};
       const rooms = shuffle(C.ROOMS.map((r) => r.key));
@@ -386,21 +446,90 @@
       s.roomVar = {};
       C.ROOMS.forEach((r) => (s.roomVar[r.key] = Math.random() < 0.5 ? 1 : 2));
       // pions
-      s.tokens = {};
-      C.ROTOMS.forEach((r) => (s.tokens['r:' + r.key] = { x: r.start[0], y: r.start[1] }));
+      s.loc = {};
+      C.ROTOMS.forEach((r) => (s.loc['r:' + r.key] = { t: 'start', k: r.key }));
       const itemRooms = shuffle(C.ROOMS.map((r) => r.key));
-      C.ITEMS.forEach((it, i) => this.placeInRoom('i:' + it.key, itemRooms[i]));
-      s.phase = 'playing'; s.turn = 0; s.rolled = false; s.suggested = false; s.dice = null; s.suggestion = null; s.winner = null;
+      C.ITEMS.forEach((it, i) => (s.loc['i:' + it.key] = { t: 'room', r: itemRooms[i] }));
+      this.layout();
+      s.phase = 'playing'; s.turn = 0; s.rolled = false; s.suggested = false; s.dice = null; s.suggestion = null; s.winner = null; s.move = null;
       this.log('🌀 La partie commence ! Les cartes sont distribuées, le Peebboof est scellé.', 'start');
       this.log(`C'est au tour de ${this.current().name}.`, 'turn');
     }
 
-    placeInRoom(tok, room) {
-      const s = this.s;
-      const [cx, cy] = roomCenter(room);
-      const taken = Object.entries(s.tokens).filter(([k, v]) => k !== tok && roomAt(v.x, v.y) === room).length;
-      const [dx, dy] = SLOT[taken % SLOT.length];
-      s.tokens[tok] = { x: cx + dx * 0.04, y: cy + dy * 0.04 };
+    roomOf(tok) { const l = this.s.loc[tok]; return l && l.t === 'room' ? l.r : null; }
+
+    layout() {
+      const s = this.s, perRoom = {};
+      s.tokens = {};
+      for (const tok of TOKORDER) {
+        const l = s.loc[tok];
+        if (!l) continue;
+        if (l.t === 'start') { const r = C.ROTOMS.find((x) => x.key === l.k); s.tokens[tok] = { x: r.start[0], y: r.start[1] }; }
+        else if (l.t === 'cell') { const [x, y] = cellXY(l.c); s.tokens[tok] = { x, y }; }
+        else {
+          const n = (perRoom[l.r] = (perRoom[l.r] || 0) + 1) - 1;
+          const g = GEO[l.r]['1'];
+          const [dx, dy] = SLOT[n % SLOT.length];
+          s.tokens[tok] = { x: g.x + g.w / 2 + dx * 0.042, y: g.y + g.h / 2 + dy * 0.042 };
+        }
+      }
+    }
+
+    doorAt(cell, dir) {
+      for (const r of C.ROOMS) {
+        for (const d of C.DOORS[r.key] || []) {
+          if (d.cell === cell && d.dir === dir) return { room: r.key, isOpen: d.open.includes(this.s.roomVar[r.key]) };
+        }
+      }
+      return null;
+    }
+    openDoors(room) { return (C.DOORS[room] || []).filter((d) => d.open.includes(this.s.roomVar[room])); }
+    occupant(cell, exceptTok) {
+      for (const [tok, l] of Object.entries(this.s.loc)) if (tok !== exceptTok && tok[0] === 'r' && l.t === 'cell' && l.c === cell) return tok;
+      return null;
+    }
+
+    moveTo(p, target) {
+      const s = this.s, m = s.move, tok = 'r:' + p.rotom;
+      if (target.t === 'cell') {
+        if (m.path.some((l) => l.t === 'cell' && l.c === target.c)) return 'Tu es déjà passé par cette case pendant ce tour.';
+        const occ = this.occupant(target.c, tok);
+        if (occ) { const o = s.players.find((q) => 'r:' + q.rotom === occ); return `Case occupée par ${o ? o.name : rotomName(occ.slice(2))}.`; }
+        s.loc[tok] = { ...target }; m.path.push({ ...target }); m.steps -= 1;
+        this.layout();
+        return;
+      }
+      if (target.r === m.startRoom) return 'Tu ne peux pas revenir dans la pièce que tu viens de quitter pendant ce tour.';
+      s.loc[tok] = { ...target }; m.path.push({ ...target }); m.steps = 0; m.entered = true;
+      this.layout();
+      this.enterRoom(p, target.r);
+    }
+
+    moveOpts() {
+      const s = this.s, cur = this.current(), m = s.move;
+      if (!cur || !m) return null;
+      const tok = 'r:' + cur.rotom, l = s.loc[tok];
+      const o = { steps: m.steps, canUndo: m.path.length > 1 && !m.entered, entered: m.entered, dirs: {}, exits: [] };
+      if (m.steps <= 0) return o;
+      const okCell = (c) => CELLS.has(c) && !m.path.some((x) => x.t === 'cell' && x.c === c) && !this.occupant(c, tok);
+      const roomXY = (r) => { const g = GEO[r]['1']; return [g.x + g.w / 2, g.y + g.h / 2]; };
+      if (l.t === 'start') {
+        const st = C.ROTOMS.find((r) => r.key === l.k);
+        if (okCell(st.cell)) { const [x, y] = cellXY(st.cell); o.dirs[st.exitDir] = { cell: st.cell, x, y }; }
+      } else if (l.t === 'cell') {
+        for (const d of Object.keys(DIRS)) {
+          const door = this.doorAt(l.c, d);
+          if (door) {
+            if (door.isOpen && door.room !== m.startRoom) { const [x, y] = roomXY(door.room); o.dirs[d] = { room: door.room, x, y }; }
+          } else {
+            const nc = addDir(l.c, d);
+            if (okCell(nc)) { const [x, y] = cellXY(nc); o.dirs[d] = { cell: nc, x, y }; }
+          }
+        }
+      } else if (!m.entered) {
+        for (const d of this.openDoors(l.r)) if (okCell(d.cell)) { const [x, y] = cellXY(d.cell); o.exits.push({ cell: d.cell, x, y }); }
+      }
+      return o;
     }
 
     enterRoom(p, room) {
@@ -453,10 +582,10 @@
         const i = (s.turn + k) % n;
         if (!this.P(s.order[i]).eliminated) { s.turn = i; break; }
       }
-      s.rolled = false; s.suggested = false; s.dice = null; s.suggestion = null;
+      s.rolled = false; s.suggested = false; s.dice = null; s.suggestion = null; s.move = null;
       this.log(`C'est au tour de ${this.current().name}.`, 'turn');
     }
   }
 
-  window.RCHost = { Host, cardName, roomAt, rotomName, itemName, roomName, ghostNum };
+  window.RCHost = { Host, cardName, rotomName, itemName, roomName, ghostNum, cellXY };
 })();
